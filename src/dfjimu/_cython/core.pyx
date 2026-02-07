@@ -152,7 +152,9 @@ def run_mekf_cython(np.ndarray[DTYPE_t, ndim=2] gyr1,
                     np.ndarray[DTYPE_t, ndim=2] C2,
                     double Fs,
                     np.ndarray[DTYPE_t, ndim=1] q_init,
-                    np.ndarray[DTYPE_t, ndim=1] Q_in):
+                    np.ndarray[DTYPE_t, ndim=1] Q_in,
+                    double R_diag=0.011552,
+                    double P_init_diag=0.1225):
     
     cdef int N = gyr1.shape[0]
     cdef double dt = 1.0 / Fs
@@ -178,7 +180,7 @@ def run_mekf_cython(np.ndarray[DTYPE_t, ndim=2] gyr1,
         for j in range(6):
             P[i][j] = 0.0
     for i in range(6):
-        P[i][i] = 0.35 * 0.35
+        P[i][i] = P_init_diag
         
     # GQGt = dt^2 * Q
     cdef double GQGt[6]
@@ -186,7 +188,7 @@ def run_mekf_cython(np.ndarray[DTYPE_t, ndim=2] gyr1,
         GQGt[i] = (dt*dt) * Q_in[i]
         if GQGt[i] < 1e-12: GQGt[i] = 1e-8 # floor
         
-    cdef double R_val = 2.0 * (0.076 * 0.076)
+    cdef double R_val = R_diag
     
     # Temps
     cdef double F[6][6]

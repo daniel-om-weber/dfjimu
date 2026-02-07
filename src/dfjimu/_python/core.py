@@ -4,7 +4,8 @@ import numpy as np
 from ..utils.common import EXPq, EXPr, quat2matrix, crossM, quatmultiply
 
 
-def run_mekf_cython(gyr1, gyr2, acc1, acc2, C1, C2, Fs, q_init, Q_in):
+def run_mekf_cython(gyr1, gyr2, acc1, acc2, C1, C2, Fs, q_init, Q_in,
+                    R_diag=0.011552, P_init_diag=0.1225):
     """
     Pure Python MEKF filter matching the Cython implementation signature.
 
@@ -34,13 +35,13 @@ def run_mekf_cython(gyr1, gyr2, acc1, acc2, C1, C2, Fs, q_init, Q_in):
     q_s2_out[0] = q_init
 
     # Covariance P (6x6)
-    P = np.eye(6) * (0.35 ** 2)
+    P = np.eye(6) * P_init_diag
 
     # Process noise
     GQGt = dt * dt * Q_in.copy()
     GQGt[GQGt < 1e-12] = 1e-8
 
-    R_val = 2.0 * (0.076 ** 2)
+    R_val = R_diag
 
     for t in range(1, N):
         # --- Time Update ---
