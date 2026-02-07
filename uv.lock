@@ -632,7 +632,7 @@ examples = [
 
 [package.metadata]
 requires-dist = [
-    { name = "cython", marker = "extra == 'dev'" },
+    { name = "cython", marker = "extra == 'dev'", specifier = ">=3.0" },
     { name = "jupyter", marker = "extra == 'examples'" },
     { name = "matplotlib", marker = "extra == 'examples'" },
     { name = "numpy" },

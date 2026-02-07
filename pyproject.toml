@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "dfjimu"
-version = "0.1.0"
+version = "0.2.0"
 description = "Drift-free IMU-based joint kinematics estimation (Weygers & Kok, 2020)"
 readme = "README.md"
 license = "MIT"
