@@ -5,11 +5,12 @@ try:
 except ImportError:
     from ._python.core import run_mekf_cython
 
+from .lever_arms import estimate_lever_arms
 from .utils.common import preprocess_acc_at_center
 
 
-def mekf_acc(gyr1, gyr2, acc1, acc2, r1, r2, Fs, q_init, Q_cov=None,
-             R_diag=0.011552, P_init_diag=0.1225):
+def mekf_acc(gyr1, gyr2, acc1, acc2, r1=None, r2=None, Fs=None, q_init=None,
+             Q_cov=None, R_diag=0.011552, P_init_diag=0.1225):
     """
     Run the MEKF-acc filter (Weygers & Kok, 2020).
 
@@ -17,7 +18,8 @@ def mekf_acc(gyr1, gyr2, acc1, acc2, r1, r2, Fs, q_init, Q_cov=None,
     -----------
     gyr1, gyr2 : (N, 3) gyroscope data
     acc1, acc2 : (N, 3) accelerometer data
-    r1, r2 : (3,) position vectors of sensors from joint center
+    r1, r2 : (3,) position vectors of sensors from joint center, or None
+        to auto-estimate via estimate_lever_arms()
     Fs : float, sampling frequency in Hz
     q_init : (4,) initial quaternion [w, x, y, z]
     Q_cov : (6,) gyroscope noise covariance, or None to auto-estimate
@@ -29,6 +31,9 @@ def mekf_acc(gyr1, gyr2, acc1, acc2, r1, r2, Fs, q_init, Q_cov=None,
     --------
     q1, q2 : (N, 4) estimated orientation quaternions
     """
+    if r1 is None or r2 is None:
+        r1, r2 = estimate_lever_arms(gyr1, gyr2, acc1, acc2, Fs)
+
     C1 = preprocess_acc_at_center(gyr1, acc1, r1, Fs)
     C2 = preprocess_acc_at_center(gyr2, acc2, r2, Fs)
 
@@ -60,12 +65,14 @@ class MekfAcc:
     Stores sensor data and configuration, delegates to mekf_acc().
     """
 
-    def __init__(self, gyr1, gyr2, acc1, acc2, r1, r2, Fs, Q_cov=None,
-                 R_diag=0.011552, P_init_diag=0.1225):
+    def __init__(self, gyr1, gyr2, acc1, acc2, r1=None, r2=None, Fs=None,
+                 Q_cov=None, R_diag=0.011552, P_init_diag=0.1225):
         self.gyr1 = gyr1
         self.gyr2 = gyr2
         self.acc1 = acc1
         self.acc2 = acc2
+        if r1 is None or r2 is None:
+            r1, r2 = estimate_lever_arms(gyr1, gyr2, acc1, acc2, Fs)
         self.r1 = r1
         self.r2 = r2
         self.Fs = Fs

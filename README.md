@@ -2,60 +2,72 @@
 
 High-performance Python/Cython implementation of the drift-free joint kinematics estimation method from [Weygers & Kok (2020), "Drift-Free Inertial Sensor-Based Joint Kinematics for Long-Term Arbitrary Movements"](https://ieeexplore.ieee.org/document/9044292/).
 
-It includes:
-1.  **MAP-acc** (optimization-based smoothing): Gauss-Newton optimizer for high-accuracy offline joint kinematics.
-2.  **MEKF-acc** (Multiplicative Extended Kalman Filter): Online filtering.
+Two algorithms are provided:
+
+- **MEKF-acc** — online Multiplicative Extended Kalman Filter
+- **MAP-acc** — offline Gauss-Newton optimizer for higher accuracy
 
 ## Installation
+
+Pre-built wheels with the fast Cython backend are available for Linux, macOS, and Windows (Python 3.10+):
 
 ```bash
 pip install dfjimu
 ```
 
-A C compiler is recommended for the fast Cython backend. If unavailable, the package falls back to pure Python automatically.
+When installing from the source distribution (no matching wheel), a C compiler is required for the Cython extension. If compilation fails, the package falls back to a pure Python backend automatically.
 
-## Development
-
-```bash
-# Install in editable mode
-uv pip install -e .
-
-# With Jupyter and matplotlib for running the example notebook
-uv pip install -e ".[examples]"
-
-# With dev tools (Cython, pytest)
-uv pip install -e ".[dev]"
-```
-
-## Usage Example
+## Usage
 
 ```python
 from dfjimu import mekf_acc, map_acc
 
-# MEKF-acc (online filtering)
+# MEKF-acc — lever arms r1, r2 are auto-estimated when omitted
+q1, q2 = mekf_acc(gyr1, gyr2, acc1, acc2, Fs=Fs, q_init=q_init)
+
+# Or provide lever arms explicitly
 q1, q2 = mekf_acc(gyr1, gyr2, acc1, acc2, r1, r2, Fs, q_init)
 
 # MAP-acc (optimization-based smoothing)
-q1, q2 = map_acc(gyr1, gyr2, acc1, acc2, r1, r2, Fs, q_init,
-                 cov_w, cov_i, cov_lnk)
+q1, q2 = map_acc(gyr1, gyr2, acc1, acc2, Fs=Fs, q_init=q_init,
+                 cov_w=cov_w, cov_i=cov_i, cov_lnk=cov_lnk)
 ```
 
 See [`examples/demo.ipynb`](examples/demo.ipynb) for a full walkthrough with plots.
 
-## Running Benchmarks
+## API
 
-Evaluate accuracy and speed of the solvers on the dataset:
+| Function | Description |
+|---|---|
+| `mekf_acc()` / `MekfAcc` | MEKF-acc filter (online) |
+| `map_acc()` / `MapAcc` | MAP-acc optimizer (offline, higher accuracy) |
+| `estimate_lever_arms()` | Lever arm estimation from dual-IMU data |
+
+Both `mekf_acc` and `map_acc` accept optional `r1`, `r2` lever arm vectors. When omitted (`None`), they are auto-estimated via `estimate_lever_arms()`.
+
+## Development
 
 ```bash
-uv run tests/evaluate_package.py
+# Install in editable mode with dev tools
+pip install -e ".[dev]"
+
+# Build Cython extensions in-place
+python setup.py build_ext --inplace
+
+# Run tests
+pytest tests/
+
+# Install with Jupyter and matplotlib for the example notebook
+pip install -e ".[examples]"
 ```
 
-## Package Structure
+## Benchmarks
 
--   **`dfjimu/`**: The Python package source.
-    -   `map_acc()` / `MapAcc`: MAP-acc optimizer (uses Cython).
-    -   `mekf_acc()` / `MekfAcc`: MEKF-acc filter (uses Cython).
-    -   `_python/`: Pure Python reference implementations for educational/debugging purposes.
+Evaluate accuracy and speed of the solvers across all datasets:
+
+```bash
+python tests/evaluate_package.py
+```
 
 ## Reference
 

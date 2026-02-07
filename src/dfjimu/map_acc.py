@@ -5,11 +5,12 @@ try:
     from ._cython.optimizer import build_system_cython, update_lin_points_cython
 except ImportError:
     from ._python.optimizer import build_system_cython, update_lin_points_cython
+from .lever_arms import estimate_lever_arms
 from .utils.common import integrateGyr, preprocess_acc_at_center
 
 
-def map_acc(gyr1, gyr2, acc1, acc2, r1, r2, Fs, q_init,
-            cov_w, cov_i, cov_lnk, iterations=10, tol=1e-4):
+def map_acc(gyr1, gyr2, acc1, acc2, r1=None, r2=None, Fs=None, q_init=None,
+            cov_w=None, cov_i=None, cov_lnk=None, iterations=10, tol=1e-4):
     """
     Run the MAP-acc estimator (Weygers & Kok, 2020).
 
@@ -17,7 +18,8 @@ def map_acc(gyr1, gyr2, acc1, acc2, r1, r2, Fs, q_init,
     -----------
     gyr1, gyr2 : (N, 3) gyroscope data
     acc1, acc2 : (N, 3) accelerometer data
-    r1, r2 : (3,) position vectors of sensors from joint center
+    r1, r2 : (3,) position vectors of sensors from joint center, or None
+        to auto-estimate via estimate_lever_arms()
     Fs : float, sampling frequency
     q_init : (4,) initial quaternion [w, x, y, z]
     cov_w : (6, 6) gyroscope noise covariance
@@ -40,11 +42,14 @@ class MapAcc:
 
     Uses Gauss-Newton optimization on a sparse system.
     """
-    def __init__(self, gyr1, gyr2, acc1, acc2, r1, r2, Fs, cov_w, cov_i, cov_lnk):
+    def __init__(self, gyr1, gyr2, acc1, acc2, r1=None, r2=None, Fs=None,
+                 cov_w=None, cov_i=None, cov_lnk=None):
         self.gyr1 = gyr1
         self.gyr2 = gyr2
         self.acc1 = acc1
         self.acc2 = acc2
+        if r1 is None or r2 is None:
+            r1, r2 = estimate_lever_arms(gyr1, gyr2, acc1, acc2, Fs)
         self.r1 = r1
         self.r2 = r2
         self.Fs = Fs
