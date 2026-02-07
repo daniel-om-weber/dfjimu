@@ -9,6 +9,8 @@ description = "Drift-free IMU-based joint kinematics estimation (Weygers & Kok, 
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.10"
+authors = [{name = "Daniel Oliver Martin Weber"}]
+keywords = ["IMU", "joint-kinematics", "MEKF", "quaternion", "inertial-sensors"]
 dependencies = [
     "numpy",
     "scipy",
@@ -23,6 +25,8 @@ classifiers = [
 
 [project.urls]
 Homepage = "https://github.com/daniel-om-weber/dfjimu"
+Repository = "https://github.com/daniel-om-weber/dfjimu"
+Issues = "https://github.com/daniel-om-weber/dfjimu/issues"
 
 [project.optional-dependencies]
 examples = [
@@ -32,6 +36,7 @@ examples = [
 dev = [
     "cython",
     "setuptools",
+    "pytest",
 ]
 
 [tool.setuptools.packages.find]

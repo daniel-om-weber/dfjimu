@@ -6,36 +6,25 @@ It includes:
 1.  **MAP-acc** (optimization-based smoothing): Gauss-Newton optimizer for high-accuracy offline joint kinematics.
 2.  **MEKF-acc** (Multiplicative Extended Kalman Filter): Online filtering.
 
-## Package Structure
-
-The core logic is in the `dfjimu` package.
-
--   **`dfjimu/`**: The Python package source.
-    -   `map_acc()` / `MapAcc`: MAP-acc optimizer (uses Cython).
-    -   `mekf_acc()` / `MekfAcc`: MEKF-acc filter (uses Cython).
-    -   `_python/`: Pure Python reference implementations for educational/debugging purposes.
-
 ## Installation
 
-You need a C compiler (GCC/Clang) for the Cython extensions.
+```bash
+pip install dfjimu
+```
+
+A C compiler is recommended for the fast Cython backend. If unavailable, the package falls back to pure Python automatically.
+
+## Development
 
 ```bash
-# Core package
+# Install in editable mode
 uv pip install -e .
 
 # With Jupyter and matplotlib for running the example notebook
 uv pip install -e ".[examples]"
 
-# With Cython build tools for development
+# With dev tools (Cython, pytest)
 uv pip install -e ".[dev]"
-```
-
-## Running Benchmarks
-
-Evaluate accuracy and speed of the solvers on the dataset:
-
-```bash
-uv run tests/evaluate_package.py
 ```
 
 ## Usage Example
@@ -52,6 +41,21 @@ q1, q2 = map_acc(gyr1, gyr2, acc1, acc2, r1, r2, Fs, q_init,
 ```
 
 See [`examples/demo.ipynb`](examples/demo.ipynb) for a full walkthrough with plots.
+
+## Running Benchmarks
+
+Evaluate accuracy and speed of the solvers on the dataset:
+
+```bash
+uv run tests/evaluate_package.py
+```
+
+## Package Structure
+
+-   **`dfjimu/`**: The Python package source.
+    -   `map_acc()` / `MapAcc`: MAP-acc optimizer (uses Cython).
+    -   `mekf_acc()` / `MekfAcc`: MEKF-acc filter (uses Cython).
+    -   `_python/`: Pure Python reference implementations for educational/debugging purposes.
 
 ## Reference
 

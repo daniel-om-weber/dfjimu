@@ -17,27 +17,37 @@ class OptionalBuildExt(build_ext):
 def get_extensions():
     try:
         import numpy as np
-        from Cython.Build import cythonize
     except ImportError:
-        print("WARNING: Cython or NumPy not available. "
+        print("WARNING: NumPy not available. "
               "Skipping C extension compilation.")
         return []
 
+    try:
+        from Cython.Build import cythonize
+        USE_CYTHON = True
+    except ImportError:
+        USE_CYTHON = False
+
+    ext = '.pyx' if USE_CYTHON else '.c'
     extensions = [
         Extension(
             "dfjimu._cython.core",
-            ["src/dfjimu/_cython/core.pyx"],
+            [f"src/dfjimu/_cython/core{ext}"],
             include_dirs=[np.get_include()],
             define_macros=[("NPY_NO_DEPRECATED_API", "NPY_1_7_API_VERSION")],
         ),
         Extension(
             "dfjimu._cython.optimizer",
-            ["src/dfjimu/_cython/optimizer.pyx"],
+            [f"src/dfjimu/_cython/optimizer{ext}"],
             include_dirs=[np.get_include()],
             define_macros=[("NPY_NO_DEPRECATED_API", "NPY_1_7_API_VERSION")],
         ),
     ]
-    return cythonize(extensions, compiler_directives={'language_level': "3"})
+
+    if USE_CYTHON:
+        extensions = cythonize(extensions, compiler_directives={'language_level': "3"})
+
+    return extensions
 
 
 setup(
