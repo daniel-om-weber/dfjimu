@@ -78,6 +78,25 @@ def test_estimate_lever_arms():
     assert np.linalg.norm(r2) < 1.0
 
 
+def test_map_acc_tol():
+    gyr1, gyr2, acc1, acc2, r1, r2, Fs, q_init = _synthetic_data()
+    N = gyr1.shape[0]
+
+    cov_w = np.eye(6) * 1e-4
+    cov_i = np.eye(3) * 1e-2
+    cov_lnk = np.eye(3) * 1e-2
+
+    q1, q2 = map_acc(gyr1, gyr2, acc1, acc2, r1, r2, Fs, q_init,
+                     cov_w, cov_i, cov_lnk, iterations=10, tol=1e-6)
+
+    assert q1.shape == (N, 4)
+    assert q2.shape == (N, 4)
+    norms1 = np.linalg.norm(q1, axis=1)
+    norms2 = np.linalg.norm(q2, axis=1)
+    np.testing.assert_allclose(norms1, 1.0, atol=1e-6)
+    np.testing.assert_allclose(norms2, 1.0, atol=1e-6)
+
+
 def test_estimate_lever_arms_x0():
     gyr1, gyr2, acc1, acc2, _, _, Fs, _ = _synthetic_data(N=500)
 

@@ -9,7 +9,7 @@ from .utils.common import integrateGyr, preprocess_acc_at_center
 
 
 def map_acc(gyr1, gyr2, acc1, acc2, r1, r2, Fs, q_init,
-            cov_w, cov_i, cov_lnk, iterations=10):
+            cov_w, cov_i, cov_lnk, iterations=10, tol=1e-4):
     """
     Run the MAP-acc estimator (Weygers & Kok, 2020).
 
@@ -24,13 +24,14 @@ def map_acc(gyr1, gyr2, acc1, acc2, r1, r2, Fs, q_init,
     cov_i : (3, 3) inclination noise covariance
     cov_lnk : (3, 3) link constraint covariance
     iterations : int, max Gauss-Newton iterations (default 10)
+    tol : float, convergence threshold on update norm (default 1e-4)
 
     Returns:
     --------
     q1, q2 : (N, 4) estimated orientation quaternions
     """
     solver = MapAcc(gyr1, gyr2, acc1, acc2, r1, r2, Fs, cov_w, cov_i, cov_lnk)
-    return solver.solve(q_init, iterations=iterations)
+    return solver.solve(q_init, iterations=iterations, tol=tol)
 
 
 class MapAcc:
@@ -65,7 +66,7 @@ class MapAcc:
         self.C1 = preprocess_acc_at_center(gyr1, acc1, r1, self.Fs)
         self.C2 = preprocess_acc_at_center(gyr2, acc2, r2, self.Fs)
 
-    def solve(self, q_init, iterations=10):
+    def solve(self, q_init, iterations=10, tol=1e-4):
         # Init points
         q_lin_s1 = integrateGyr(self.gyr1, q_init, self.T)
         q_lin_s2 = integrateGyr(self.gyr2, q_init, self.T)
@@ -100,7 +101,7 @@ class MapAcc:
             q_lin_s1 = update_lin_points_cython(q_lin_s1, n_s1)
             q_lin_s2 = update_lin_points_cython(q_lin_s2, n_s2)
 
-            if np.linalg.norm(n) < 1e-4: # Simple convergence
+            if np.linalg.norm(n) < tol: # Simple convergence
                 break
 
         return q_lin_s1, q_lin_s2
