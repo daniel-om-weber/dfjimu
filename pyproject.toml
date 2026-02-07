@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=61.0", "cython", "numpy"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dfjimu"
+version = "0.1.0"
+description = "Drift-free IMU-based joint kinematics estimation (Weygers & Kok, 2020)"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.10"
+dependencies = [
+    "numpy",
+    "scipy",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Cython",
+    "Topic :: Scientific/Engineering",
+]
+
+[project.urls]
+Homepage = "https://github.com/daniel-om-weber/dfjimu"
+
+[project.optional-dependencies]
+examples = [
+    "jupyter",
+    "matplotlib",
+]
+dev = [
+    "cython",
+    "setuptools",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+dfjimu = ["*.pyx", "*.pxd", "py.typed"]
