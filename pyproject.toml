@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=61.0", "cython", "numpy"]
+requires = ["setuptools>=61.0", "cython>=3.0", "numpy"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -20,6 +20,7 @@ classifiers = [
     "Intended Audience :: Science/Research",
     "Programming Language :: Python :: 3",
     "Programming Language :: Cython",
+    "Programming Language :: Python :: 3.13",
     "Topic :: Scientific/Engineering",
 ]
 
@@ -34,7 +35,7 @@ examples = [
     "matplotlib",
 ]
 dev = [
-    "cython",
+    "cython>=3.0",
     "setuptools",
     "pytest",
 ]
