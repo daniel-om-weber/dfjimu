@@ -42,6 +42,12 @@ def get_extensions():
             include_dirs=[np.get_include()],
             define_macros=[("NPY_NO_DEPRECATED_API", "NPY_1_7_API_VERSION")],
         ),
+        Extension(
+            "dfjimu._cython.lever_arms",
+            [f"src/dfjimu/_cython/lever_arms{ext}"],
+            include_dirs=[np.get_include()],
+            define_macros=[("NPY_NO_DEPRECATED_API", "NPY_1_7_API_VERSION")],
+        ),
     ]
 
     if USE_CYTHON:

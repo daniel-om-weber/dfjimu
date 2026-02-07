@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 
 import dfjimu
-from dfjimu import mekf_acc, map_acc, _CYTHON_AVAILABLE
+from dfjimu import mekf_acc, map_acc, estimate_lever_arms, _CYTHON_AVAILABLE
 
 
 def _synthetic_data(N=100, Fs=100.0):
@@ -63,3 +63,30 @@ def test_map_acc():
     norms2 = np.linalg.norm(q2, axis=1)
     np.testing.assert_allclose(norms1, 1.0, atol=1e-6)
     np.testing.assert_allclose(norms2, 1.0, atol=1e-6)
+
+
+def test_estimate_lever_arms():
+    gyr1, gyr2, acc1, acc2, _, _, Fs, _ = _synthetic_data(N=500)
+
+    r1, r2 = estimate_lever_arms(gyr1, gyr2, acc1, acc2, Fs)
+
+    assert r1.shape == (3,)
+    assert r2.shape == (3,)
+    assert np.all(np.isfinite(r1))
+    assert np.all(np.isfinite(r2))
+    assert np.linalg.norm(r1) < 1.0
+    assert np.linalg.norm(r2) < 1.0
+
+
+def test_estimate_lever_arms_x0():
+    gyr1, gyr2, acc1, acc2, _, _, Fs, _ = _synthetic_data(N=500)
+
+    x0 = np.array([0.05, 0.0, 0.0, -0.05, 0.0, 0.0])
+    r1, r2 = estimate_lever_arms(gyr1, gyr2, acc1, acc2, Fs, x0=x0)
+
+    assert r1.shape == (3,)
+    assert r2.shape == (3,)
+    assert np.all(np.isfinite(r1))
+    assert np.all(np.isfinite(r2))
+    assert np.linalg.norm(r1) < 1.0
+    assert np.linalg.norm(r2) < 1.0
