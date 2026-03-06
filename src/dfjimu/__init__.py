@@ -1,4 +1,4 @@
-__version__ = "0.2.1"
+__version__ = "0.3.0"
 _CYTHON_AVAILABLE = False
 
 try:
@@ -13,6 +13,8 @@ except ImportError:
 
 from .mekf_acc import mekf_acc, MekfAcc
 from .map_acc import map_acc, MapAcc
+from .map_acc_stable import map_acc_stable, MapAccStable
 from .lever_arms import estimate_lever_arms
 
-__all__ = ['mekf_acc', 'MekfAcc', 'map_acc', 'MapAcc', 'estimate_lever_arms', '_CYTHON_AVAILABLE']
+__all__ = ['mekf_acc', 'MekfAcc', 'map_acc', 'MapAcc', 'map_acc_stable',
+           'MapAccStable', 'estimate_lever_arms', '_CYTHON_AVAILABLE']

@@ -269,12 +269,35 @@ def LOGq(q):
     w = q[0]
     v = q[1:]
     nv = np.linalg.norm(v)
-    
+
     if nv < 1e-12:
         return np.zeros(3)
-    
+
     theta = np.arccos(np.clip(w, -1.0, 1.0))
     scale = theta / nv
+    return v * scale
+
+
+def LOGq_stable(q):
+    """
+    Logarithm map from quaternion to vector (numerically stable).
+
+    Uses atan2(nv, w) instead of acos(w)/nv, which avoids:
+    - precision loss near identity (acos'(1) = -inf)
+    - the 0/0 indeterminate form when nv -> 0
+    - the need to clamp w to [-1, 1]
+
+    q: (4,)
+    """
+    q = np.atleast_1d(q)
+    w = q[0]
+    v = q[1:]
+    nv = np.linalg.norm(v)
+
+    if nv < 1e-15:
+        return np.zeros(3)
+
+    scale = np.arctan2(nv, w) / nv
     return v * scale
 
 def quatL(q):

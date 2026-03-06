@@ -5,7 +5,7 @@
 
 import numpy as np
 cimport numpy as np
-from libc.math cimport sqrt, sin, cos, acos, fabs
+from libc.math cimport sqrt, sin, cos, acos, atan2, fabs
 
 ctypedef np.float64_t DTYPE_t
 
@@ -72,6 +72,15 @@ cdef inline void log_q(double* q, double* v) nogil:
         if q[0] > 1.0: q[0] = 1.0
         elif q[0] < -1.0: q[0] = -1.0
         scale = acos(q[0]) / nv
+        v[0]=q[1]*scale; v[1]=q[2]*scale; v[2]=q[3]*scale
+
+cdef inline void log_q_stable(double* q, double* v) nogil:
+    cdef double nv = sqrt(q[1]*q[1] + q[2]*q[2] + q[3]*q[3])
+    cdef double scale
+    if nv < 1e-15:
+        v[0]=0.0; v[1]=0.0; v[2]=0.0
+    else:
+        scale = atan2(nv, q[0]) / nv
         v[0]=q[1]*scale; v[1]=q[2]*scale; v[2]=q[3]*scale
 
 # Matrices for derivatives
@@ -321,6 +330,224 @@ def build_system_cython(
         epsilon, 
         j_data[:idx_nnz], 
         j_rows[:idx_nnz], 
+        j_cols[:idx_nnz]
+    )
+
+def build_system_stable_cython(
+    np.ndarray[DTYPE_t, ndim=2] q_lin_s1,
+    np.ndarray[DTYPE_t, ndim=2] q_lin_s2,
+    np.ndarray[DTYPE_t, ndim=2] gyr1,
+    np.ndarray[DTYPE_t, ndim=2] gyr2,
+    np.ndarray[DTYPE_t, ndim=2] C1,
+    np.ndarray[DTYPE_t, ndim=2] C2,
+    np.ndarray[DTYPE_t, ndim=1] q_init,
+    double Fs,
+    np.ndarray[DTYPE_t, ndim=2] icov_w1,
+    np.ndarray[DTYPE_t, ndim=2] icov_w2,
+    np.ndarray[DTYPE_t, ndim=2] icov_i,
+    np.ndarray[DTYPE_t, ndim=2] icov_lnk
+):
+    """Same as build_system_cython but uses atan2-based log_q_stable."""
+    cdef int N = q_lin_s1.shape[0]
+    cdef double dt = 1.0 / Fs
+
+    cdef int n_err = 9 * N
+    cdef np.ndarray[DTYPE_t, ndim=1] epsilon = np.zeros(n_err, dtype=np.float64)
+
+    cdef int max_nnz = 60 * N
+    cdef np.ndarray[DTYPE_t, ndim=1] j_data = np.zeros(max_nnz, dtype=np.float64)
+    cdef np.ndarray[np.int32_t, ndim=1] j_rows = np.zeros(max_nnz, dtype=np.int32)
+    cdef np.ndarray[np.int32_t, ndim=1] j_cols = np.zeros(max_nnz, dtype=np.int32)
+
+    cdef int idx_nnz = 0
+    cdef int idx_err = 0
+
+    cdef double q_tmp[4], q_conj[4], q_res[4], v_tmp[3], v_res[3]
+    cdef double mat3_tmp[9], mat3_res[9], mat4_tmp[16]
+    cdef double L[16], R[16]
+    cdef int t, i, j
+
+    cdef double* p_icov_i = &icov_i[0,0]
+    cdef double* p_icov_w1 = &icov_w1[0,0]
+    cdef double* p_icov_w2 = &icov_w2[0,0]
+    cdef double* p_icov_lnk = &icov_lnk[0,0]
+
+    # --- Sensor 1: Init cost ---
+    cdef double q_init_inv[4]
+    quat_conj(&q_init[0], q_init_inv)
+    quat_mul(q_init_inv, &q_lin_s1[0, 0], q_tmp)
+    log_q_stable(q_tmp, v_tmp)
+    for i in range(3): v_res[i] = 2.0 * v_tmp[i]
+    mat3_vec_mul(p_icov_i, v_res, &epsilon[0])
+
+    get_quatL(q_tmp, L)
+    for i in range(3):
+        for j in range(3):
+            mat3_tmp[i*3+j] = L[(i+1)*4 + (j+1)]
+    mat3_mul(p_icov_i, mat3_tmp, mat3_res)
+
+    for i in range(3):
+        for j in range(3):
+            if mat3_res[i*3+j] != 0:
+                j_data[idx_nnz] = mat3_res[i*3+j]
+                j_rows[idx_nnz] = i
+                j_cols[idx_nnz] = j
+                idx_nnz += 1
+
+    # --- Sensor 1: Motion cost ---
+    cdef int row_offset = 3
+    cdef double q_prev[4], q_curr[4]
+
+    for t in range(1, N):
+        for i in range(4): q_prev[i] = q_lin_s1[t-1, i]
+        for i in range(4): q_curr[i] = q_lin_s1[t, i]
+
+        quat_conj(q_prev, q_conj)
+        quat_mul(q_conj, q_curr, q_tmp)
+        log_q_stable(q_tmp, v_tmp)
+        for i in range(3): v_res[i] = (2.0/dt)*v_tmp[i] - gyr1[t-1, i]
+        mat3_vec_mul(p_icov_w1, v_res, &epsilon[row_offset + (t-1)*3])
+
+        get_quatR(q_tmp, R)
+        for i in range(3):
+            for j in range(3):
+                mat3_tmp[i*3+j] = -1.0 * R[(i+1)*4 + (j+1)] * (1.0/dt)
+        mat3_mul(p_icov_w1, mat3_tmp, mat3_res)
+
+        for i in range(3):
+            for j in range(3):
+                if mat3_res[i*3+j] != 0:
+                    j_data[idx_nnz] = mat3_res[i*3+j]
+                    j_rows[idx_nnz] = row_offset + (t-1)*3 + i
+                    j_cols[idx_nnz] = (t-1)*3 + j
+                    idx_nnz += 1
+
+        get_quatL(q_tmp, L)
+        for i in range(3):
+            for j in range(3):
+                mat3_tmp[i*3+j] = L[(i+1)*4 + (j+1)] * (1.0/dt)
+        mat3_mul(p_icov_w1, mat3_tmp, mat3_res)
+
+        for i in range(3):
+            for j in range(3):
+                if mat3_res[i*3+j] != 0:
+                    j_data[idx_nnz] = mat3_res[i*3+j]
+                    j_rows[idx_nnz] = row_offset + (t-1)*3 + i
+                    j_cols[idx_nnz] = t*3 + j
+                    idx_nnz += 1
+
+    # --- Sensor 2: Init cost ---
+    row_offset = 3 * N
+    cdef int col_offset = 3 * N
+
+    quat_conj(&q_init[0], q_init_inv)
+    quat_mul(q_init_inv, &q_lin_s2[0, 0], q_tmp)
+    log_q_stable(q_tmp, v_tmp)
+    for i in range(3): v_res[i] = 2.0 * v_tmp[i]
+    mat3_vec_mul(p_icov_i, v_res, &epsilon[row_offset])
+
+    get_quatL(q_tmp, L)
+    for i in range(3):
+        for j in range(3):
+            mat3_tmp[i*3+j] = L[(i+1)*4 + (j+1)]
+    mat3_mul(p_icov_i, mat3_tmp, mat3_res)
+
+    for i in range(3):
+        for j in range(3):
+            if mat3_res[i*3+j] != 0:
+                j_data[idx_nnz] = mat3_res[i*3+j]
+                j_rows[idx_nnz] = row_offset + i
+                j_cols[idx_nnz] = col_offset + j
+                idx_nnz += 1
+
+    row_offset += 3
+
+    # --- Sensor 2: Motion cost ---
+    for t in range(1, N):
+        for i in range(4): q_prev[i] = q_lin_s2[t-1, i]
+        for i in range(4): q_curr[i] = q_lin_s2[t, i]
+
+        quat_conj(q_prev, q_conj)
+        quat_mul(q_conj, q_curr, q_tmp)
+        log_q_stable(q_tmp, v_tmp)
+        for i in range(3): v_res[i] = (2.0/dt)*v_tmp[i] - gyr2[t-1, i]
+        mat3_vec_mul(p_icov_w2, v_res, &epsilon[row_offset + (t-1)*3])
+
+        get_quatR(q_tmp, R)
+        for i in range(3):
+            for j in range(3):
+                mat3_tmp[i*3+j] = -1.0 * R[(i+1)*4 + (j+1)] * (1.0/dt)
+        mat3_mul(p_icov_w2, mat3_tmp, mat3_res)
+
+        for i in range(3):
+            for j in range(3):
+                if mat3_res[i*3+j] != 0:
+                    j_data[idx_nnz] = mat3_res[i*3+j]
+                    j_rows[idx_nnz] = row_offset + (t-1)*3 + i
+                    j_cols[idx_nnz] = col_offset + (t-1)*3 + j
+                    idx_nnz += 1
+
+        get_quatL(q_tmp, L)
+        for i in range(3):
+            for j in range(3):
+                mat3_tmp[i*3+j] = L[(i+1)*4 + (j+1)] * (1.0/dt)
+        mat3_mul(p_icov_w2, mat3_tmp, mat3_res)
+
+        for i in range(3):
+            for j in range(3):
+                if mat3_res[i*3+j] != 0:
+                    j_data[idx_nnz] = mat3_res[i*3+j]
+                    j_rows[idx_nnz] = row_offset + (t-1)*3 + i
+                    j_cols[idx_nnz] = col_offset + t*3 + j
+                    idx_nnz += 1
+
+    # --- Link constraint ---
+    row_offset = 6 * N
+    cdef double R1[9], R2[9], c1[3], c2[3], term1[3], term2[3], err_lnk[3], mat3_cross[9]
+
+    for t in range(N):
+        for i in range(4): q_prev[i] = q_lin_s1[t, i]
+        for i in range(4): q_curr[i] = q_lin_s2[t, i]
+
+        quat2rot(q_prev, R1)
+        quat2rot(q_curr, R2)
+
+        for i in range(3): c1[i] = C1[t, i]
+        for i in range(3): c2[i] = C2[t, i]
+
+        mat3_vec_mul(R1, c1, term1)
+        mat3_vec_mul(R2, c2, term2)
+        for i in range(3): err_lnk[i] = term1[i] - term2[i]
+        mat3_vec_mul(p_icov_lnk, err_lnk, &epsilon[row_offset + t*3])
+
+        cross_mat(c1, mat3_cross)
+        mat3_mul(R1, mat3_cross, mat3_tmp)
+        mat3_mul(p_icov_lnk, mat3_tmp, mat3_res)
+
+        for i in range(3):
+            for j in range(3):
+                if mat3_res[i*3+j] != 0:
+                    j_data[idx_nnz] = -mat3_res[i*3+j]
+                    j_rows[idx_nnz] = row_offset + t*3 + i
+                    j_cols[idx_nnz] = t*3 + j
+                    idx_nnz += 1
+
+        cross_mat(c2, mat3_cross)
+        mat3_mul(R2, mat3_cross, mat3_tmp)
+        mat3_mul(p_icov_lnk, mat3_tmp, mat3_res)
+
+        for i in range(3):
+            for j in range(3):
+                if mat3_res[i*3+j] != 0:
+                    j_data[idx_nnz] = mat3_res[i*3+j]
+                    j_rows[idx_nnz] = row_offset + t*3 + i
+                    j_cols[idx_nnz] = 3*N + t*3 + j
+                    idx_nnz += 1
+
+    return (
+        epsilon,
+        j_data[:idx_nnz],
+        j_rows[:idx_nnz],
         j_cols[:idx_nnz]
     )
 
